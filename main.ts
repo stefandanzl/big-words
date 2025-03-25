@@ -1,4 +1,13 @@
-import { Plugin, MarkdownView, WorkspaceLeaf, Notice, addIcon, PluginSettingTab, App, Setting } from 'obsidian';
+import {
+	Plugin,
+	MarkdownView,
+	WorkspaceLeaf,
+	PluginSettingTab,
+	App,
+	Setting,
+	Editor,
+	MarkdownFileInfo,
+} from "obsidian";
 
 interface WordCountPluginSettings {
 	countOnlyActualWords: boolean;
@@ -7,144 +16,157 @@ interface WordCountPluginSettings {
 
 const DEFAULT_SETTINGS: WordCountPluginSettings = {
 	countOnlyActualWords: true,
-	excludeFrontmatter: true
-}
+	excludeFrontmatter: true,
+};
 
 export default class WordCountPlugin extends Plugin {
 	settings: WordCountPluginSettings;
 	statusBarItem: HTMLElement;
-	
-	async onload() {
-		console.log('Loading Word Count plugin');
-		
+
+	async onload(): Promise<void> {
+		console.log("Loading Word Count plugin");
+
 		await this.loadSettings();
-		
+
 		// Add settings tab
 		this.addSettingTab(new WordCountSettingTab(this.app, this));
-		
+
 		// Create status bar item
 		this.statusBarItem = this.addStatusBarItem();
-		this.statusBarItem.setText('Words: 0');
-		
+		this.statusBarItem.setText("Words: 0");
+
 		// Register event handlers
 		this.registerEvent(
-			this.app.workspace.on('active-leaf-change', (leaf: WorkspaceLeaf) => {
-				this.updateWordCount();
-			})
+			this.app.workspace.on(
+				"active-leaf-change",
+				(leaf: WorkspaceLeaf | null) => {
+					this.updateWordCount();
+				}
+			)
 		);
-		
+
 		this.registerEvent(
-			this.app.workspace.on('editor-change', () => {
-				this.updateWordCount();
-			})
+			this.app.workspace.on(
+				"editor-change",
+				(editor: Editor, info: MarkdownView | MarkdownFileInfo) => {
+					this.updateWordCount();
+				}
+			)
 		);
-		
-		this.registerEvent(
-			this.app.workspace.on('editor-selection-change', () => {
-				this.updateWordCount();
-			})
-		);
-		
+
 		// Initial update
 		this.updateWordCount();
 	}
-	
-	onunload() {
-		console.log('Unloading Word Count plugin');
+
+	onunload(): void {
+		console.log("Unloading Word Count plugin");
 	}
-	
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+
+	async loadSettings(): Promise<void> {
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			await this.loadData()
+		);
 	}
-	
-	async saveSettings() {
+
+	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
 	}
-	
-	updateWordCount() {
+
+	updateWordCount(): void {
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		
+
 		if (!activeView) {
 			// No active markdown view
-			this.statusBarItem.setText('Words: 0');
+			this.statusBarItem.setText("Words: 0");
 			return;
 		}
-		
-		const editor = activeView.editor;
-		const selection = editor.getSelection();
-		
+
+		const editor: Editor = activeView.editor;
+		const selection: string = editor.getSelection();
+
 		// Check if there's a selection
 		if (selection && selection.trim().length > 0) {
-			const wordCount = this.countWords(selection);
+			const wordCount: number = this.countWords(selection);
 			this.statusBarItem.setText(`Selection: ${wordCount} words`);
 		} else {
 			// Get the full document text
-			let text = editor.getValue();
-			
+			let text: string = editor.getValue();
+
 			// Remove frontmatter if setting enabled
 			if (this.settings.excludeFrontmatter) {
 				text = this.removeFrontMatter(text);
 			}
-			
-			const wordCount = this.countWords(text);
+
+			const wordCount: number = this.countWords(text);
 			this.statusBarItem.setText(`Words: ${wordCount}`);
 		}
 	}
-	
+
 	countWords(text: string): number {
 		if (this.settings.countOnlyActualWords) {
 			// Split on whitespace and filter to only include "actual words" with at least one letter
 			const hasLetter = /[a-zA-ZÀ-ÿ]/; // Unicode range for most Latin letters with diacritics
-			const words = text.split(/\s+/).filter(word => hasLetter.test(word));
+			const words: string[] = text
+				.split(/\s+/)
+				.filter((word: string) => hasLetter.test(word));
 			return words.length;
 		} else {
 			// Simple word count (anything separated by whitespace)
-			return text.split(/\s+/).filter(word => word.length > 0).length;
+			return text.split(/\s+/).filter((word: string) => word.length > 0)
+				.length;
 		}
 	}
-	
+
 	removeFrontMatter(text: string): string {
 		// Check for frontmatter delimited by --- at the start of the file
 		const frontMatterRegex = /^---\s*\n(?:.*\n)*?---\s*\n/m;
-		return text.replace(frontMatterRegex, '');
+		return text.replace(frontMatterRegex, "");
 	}
 }
 
 class WordCountSettingTab extends PluginSettingTab {
 	plugin: WordCountPlugin;
-	
+
 	constructor(app: App, plugin: WordCountPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
-	
+
 	display(): void {
-		const {containerEl} = this;
-		
+		const { containerEl } = this;
+
 		containerEl.empty();
-		
-		containerEl.createEl('h2', {text: 'Word Count Settings'});
-		
+
+		containerEl.createEl("h2", { text: "Word Count Settings" });
+
 		new Setting(containerEl)
-			.setName('Count only actual words')
-			.setDesc('Only count strings containing at least one letter (a-z, A-Z, accented characters, etc.)')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.countOnlyActualWords)
-				.onChange(async (value) => {
-					this.plugin.settings.countOnlyActualWords = value;
-					await this.plugin.saveSettings();
-					this.plugin.updateWordCount();
-				}));
-		
+			.setName("Count only actual words")
+			.setDesc(
+				"Only count strings containing at least one letter (a-z, A-Z, accented characters, etc.)"
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.countOnlyActualWords)
+					.onChange(async (value: boolean) => {
+						this.plugin.settings.countOnlyActualWords = value;
+						await this.plugin.saveSettings();
+						this.plugin.updateWordCount();
+					})
+			);
+
 		new Setting(containerEl)
-			.setName('Exclude frontmatter')
-			.setDesc('Do not count words in YAML frontmatter')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.excludeFrontmatter)
-				.onChange(async (value) => {
-					this.plugin.settings.excludeFrontmatter = value;
-					await this.plugin.saveSettings();
-					this.plugin.updateWordCount();
-				}));
+			.setName("Exclude frontmatter")
+			.setDesc("Do not count words in YAML frontmatter")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.excludeFrontmatter)
+					.onChange(async (value: boolean) => {
+						this.plugin.settings.excludeFrontmatter = value;
+						await this.plugin.saveSettings();
+						this.plugin.updateWordCount();
+					})
+			);
 	}
 }
