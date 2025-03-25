@@ -1,134 +1,150 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { Plugin, MarkdownView, WorkspaceLeaf, Notice, addIcon, PluginSettingTab, App, Setting } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+interface WordCountPluginSettings {
+	countOnlyActualWords: boolean;
+	excludeFrontmatter: boolean;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: WordCountPluginSettings = {
+	countOnlyActualWords: true,
+	excludeFrontmatter: true
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
+export default class WordCountPlugin extends Plugin {
+	settings: WordCountPluginSettings;
+	statusBarItem: HTMLElement;
+	
 	async onload() {
+		console.log('Loading Word Count plugin');
+		
 		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		
+		// Add settings tab
+		this.addSettingTab(new WordCountSettingTab(this.app, this));
+		
+		// Create status bar item
+		this.statusBarItem = this.addStatusBarItem();
+		this.statusBarItem.setText('Words: 0');
+		
+		// Register event handlers
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', (leaf: WorkspaceLeaf) => {
+				this.updateWordCount();
+			})
+		);
+		
+		this.registerEvent(
+			this.app.workspace.on('editor-change', () => {
+				this.updateWordCount();
+			})
+		);
+		
+		this.registerEvent(
+			this.app.workspace.on('editor-selection-change', () => {
+				this.updateWordCount();
+			})
+		);
+		
+		// Initial update
+		this.updateWordCount();
 	}
-
+	
 	onunload() {
-
+		console.log('Unloading Word Count plugin');
 	}
-
+	
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
-
+	
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
+	
+	updateWordCount() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		
+		if (!activeView) {
+			// No active markdown view
+			this.statusBarItem.setText('Words: 0');
+			return;
+		}
+		
+		const editor = activeView.editor;
+		const selection = editor.getSelection();
+		
+		// Check if there's a selection
+		if (selection && selection.trim().length > 0) {
+			const wordCount = this.countWords(selection);
+			this.statusBarItem.setText(`Selection: ${wordCount} words`);
+		} else {
+			// Get the full document text
+			let text = editor.getValue();
+			
+			// Remove frontmatter if setting enabled
+			if (this.settings.excludeFrontmatter) {
+				text = this.removeFrontMatter(text);
+			}
+			
+			const wordCount = this.countWords(text);
+			this.statusBarItem.setText(`Words: ${wordCount}`);
+		}
+	}
+	
+	countWords(text: string): number {
+		if (this.settings.countOnlyActualWords) {
+			// Split on whitespace and filter to only include "actual words" with at least one letter
+			const hasLetter = /[a-zA-ZÀ-ÿ]/; // Unicode range for most Latin letters with diacritics
+			const words = text.split(/\s+/).filter(word => hasLetter.test(word));
+			return words.length;
+		} else {
+			// Simple word count (anything separated by whitespace)
+			return text.split(/\s+/).filter(word => word.length > 0).length;
+		}
+	}
+	
+	removeFrontMatter(text: string): string {
+		// Check for frontmatter delimited by --- at the start of the file
+		const frontMatterRegex = /^---\s*\n(?:.*\n)*?---\s*\n/m;
+		return text.replace(frontMatterRegex, '');
+	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
+class WordCountSettingTab extends PluginSettingTab {
+	plugin: WordCountPlugin;
+	
+	constructor(app: App, plugin: WordCountPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
-
+	
 	display(): void {
 		const {containerEl} = this;
-
+		
 		containerEl.empty();
-
+		
+		containerEl.createEl('h2', {text: 'Word Count Settings'});
+		
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+			.setName('Count only actual words')
+			.setDesc('Only count strings containing at least one letter (a-z, A-Z, accented characters, etc.)')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.countOnlyActualWords)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.countOnlyActualWords = value;
 					await this.plugin.saveSettings();
+					this.plugin.updateWordCount();
+				}));
+		
+		new Setting(containerEl)
+			.setName('Exclude frontmatter')
+			.setDesc('Do not count words in YAML frontmatter')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.excludeFrontmatter)
+				.onChange(async (value) => {
+					this.plugin.settings.excludeFrontmatter = value;
+					await this.plugin.saveSettings();
+					this.plugin.updateWordCount();
 				}));
 	}
 }
