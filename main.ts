@@ -54,6 +54,12 @@ export default class WordCountPlugin extends Plugin {
 			)
 		);
 
+		// Register editor-related event handlers
+		this.registerDomEvent(document, "selectionchange", (evt: Event) => {
+			// This DOM event triggers whenever selection changes anywhere in the document
+			this.updateWordCount();
+		});
+
 		// Initial update
 		this.updateWordCount();
 	}
@@ -79,17 +85,18 @@ export default class WordCountPlugin extends Plugin {
 
 		if (!activeView) {
 			// No active markdown view
-			this.statusBarItem.setText("Words: 0");
+			this.statusBarItem.setText("No editor");
 			return;
 		}
 
 		const editor: Editor = activeView.editor;
 		const selection: string = editor.getSelection();
-
+		// const selection: string | undefined =
+		// 	this.app.workspace.activeEditor?.editor?.getSelection();
 		// Check if there's a selection
 		if (selection && selection.trim().length > 0) {
 			const wordCount: number = this.countWords(selection);
-			this.statusBarItem.setText(`Selection: ${wordCount} words`);
+			this.statusBarItem.setText(`${wordCount} words`);
 		} else {
 			// Get the full document text
 			let text: string = editor.getValue();
@@ -100,7 +107,7 @@ export default class WordCountPlugin extends Plugin {
 			}
 
 			const wordCount: number = this.countWords(text);
-			this.statusBarItem.setText(`Words: ${wordCount}`);
+			this.statusBarItem.setText(`${wordCount} words`);
 		}
 	}
 
