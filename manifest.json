@@ -1,7 +1,7 @@
 {
 	"id": "big-words",
 	"name": "Big Word Count",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"minAppVersion": "0.15.0",
 	"description": "Only show relevant data in the word count",
 	"author": "stefandanzl",
