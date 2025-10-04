@@ -6,11 +6,14 @@ vars:
     FILES: "main.js styles.css manifest.json"
     VERSION:
         sh: node -e "console.log(require('./package.json').version)"
-        
+
     PLUGIN_DIR: "C:/PROJECTS/OBSIDIAN/hirn/.obsidian/plugins/big-words"
 
 tasks:
-    default: task -a
+    default:
+        cmds:
+            - task: build
+            - task: cp
 
     dev: npm run dev
 

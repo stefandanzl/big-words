@@ -1,8 +1,33 @@
-/*
+/* Word frequency modal styles */
+.word-frequency-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.word-frequency-table th,
+.word-frequency-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
 
-If your plugin does not need CSS, delete this file.
+.word-frequency-table th {
+    font-weight: 600;
+    background-color: var(--background-secondary);
+    position: sticky;
+    top: 0;
+}
 
-*/
+.word-frequency-table tr:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.word-frequency-table td:first-child {
+    font-weight: 500;
+}
+
+.word-frequency-table td:last-child {
+    text-align: right;
+    font-family: var(--font-monospace);
+}
