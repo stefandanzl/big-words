@@ -7,7 +7,9 @@ vars:
     VERSION:
         sh: node -e "console.log(require('./package.json').version)"
 
-    PLUGIN_DIR: "C:/PROJECTS/OBSIDIAN/hirn/.obsidian/plugins/big-words"
+    PLUGIN_ID: "big-words"
+    PLUGIN_NAME: "Big Words"
+    PLUGIN_DIR: "C:/PROJECTS/OBSIDIAN/hirn/.obsidian/plugins/{{.PLUGIN_ID}}"
 
 tasks:
     default:
@@ -49,7 +51,7 @@ tasks:
 
     release-create:
         cmds:
-            - gh release create {{.VERSION}} --title "{{.VERSION}}" --notes "New release of the Web Bookmarks plugin for Obsidian." {{.FILES}}
+            - gh release create {{.VERSION}} --title "{{.VERSION}}" --notes "New release of the {{.PLUGIN_NAME}} plugin for Obsidian." {{.FILES}}
 
     test:
         cmds:
